@@ -121,13 +121,16 @@ async def challenge(ctx, member : discord.Member):
             if os.path.isfile("challenges.json") == False:
                 f = open("challenges.json", "w+")
                 challenges = {}
-                challenges[ctx.message.author.id] = {
+                challenges[1] = {
+                "p1id": ctx.message.author.id,
                 "p1name": ctx.message.author.name,
                 "p2id": member.id,
                 "p2name": member.name,
                 "p1report": 0,
                 "p2report": 0,
-                "p2accept": 0
+                "p2accept": 0,
+                "p1cancel": 0,
+                "p2cancel": 0
                 }
                 s = json.dumps(challenges)
                 with open ("challenges.json", "w+") as f:
@@ -138,20 +141,33 @@ async def challenge(ctx, member : discord.Member):
                 s = f.read()
                 challenges = json.loads(s)
                 if users[ctx.message.author.id]["matched"] == 1:
-                    if (ctx.message.author.id in challenges):
-                        if challenges[ctx.message.author.id]["p2accept"] == 1:
-                            await bot.say(ctx.message.author.mention + ", you already have an accepted match with " + challenges[ctx.message.author.id]["p2name"] + ".")
-                            return await bot.say("You must both report the score using !win @[opponent] if you won and !lose @[opponent] if you lost!")
-                    for oppID in challenges:
-                        if challenges[oppID]["p2accept"] == 1 and challenges[oppID]["p2id"] == ctx.message.author.id:
-                            return await bot.say("You've already accepted a challenge from " + users[oppID]["name"] + "! Please finish that match first!")
-                challenges[ctx.message.author.id] = {
+                    for i in challenges:
+                        if challenges[i]["p1id"] == ctx.message.author.id and challenges[i]["p2accept"] == 1:
+                            await bot.say(ctx.message.author.mention + ", you have already started a match with " + challenges[i]["p2name"] + ".")
+                            return await bot.say("You must both report the score using '!win @[winner]'.")
+                        if challenges[i]["p2id"] == ctx.message.author.id and challenges[i]["p2accept"] == 1:
+                            await bot.say(ctx.message.author.mention + ", you have already started a match with " + challenges[i]["p1name"] + ".")
+                            return await bot.say("You must both report the score using '!win @[winner]'.")
+
+                for i in challenges:
+                    if challenges[i]["p1id"] == ctx.message.author.id and challenges[i]["p2id"] == member.id:
+                        return await bot.say(ctx.message.author.mention + " is challenging " + member.mention +"\ntype '!accept @[challenger]' to accept!")
+                    if challenges[i]["p2id"] == ctx.message.author.id and challenges[i]["p1id"] == member.id:
+                        return await bot.say(ctx.message.author.mention + " is challenging " + member.mention +"\ntype '!accept @[challenger]' to accept!")
+
+                i = 1
+                while i in challenges:
+                    i += 1
+                challenges[i] = {
+                "p1id": ctx.message.author.id,
                 "p1name": ctx.message.author.name,
                 "p2id": member.id,
                 "p2name": member.name,
                 "p1report": 0,
                 "p2report": 0,
-                "p2accept": 0
+                "p2accept": 0,
+                "p1cancel": 0,
+                "p2cancel": 0
                 }
                 f = open("challenges.json", "w")
                 s = json.dumps(challenges)
@@ -159,7 +175,7 @@ async def challenge(ctx, member : discord.Member):
                     f.write(s)
                 f.close()
 
-            await bot.say("Please note you can only challenge one person at a time (for now)")
+            #await bot.say("Please note you can only challenge one person at a time (for now)")
             return await bot.say(ctx.message.author.mention + " is challenging " + member.mention +"\ntype '!accept @[challenger]' to accept!")
             # other guy must accept
             # then when they finish they have to let the bot know who won
@@ -171,273 +187,247 @@ async def accept(ctx, member : discord.Member):
     if os.path.isfile("challenges.json") == False:
         return await bot.say(ctx.message.author.mention + ", " + member.name + " didn't challenge you or is challenging someone else.")
     else:
+        f = open("users.json" , "r")
+        s = f.read()
+        f.close()
+        users = json.loads(s)
+        if users[ctx.message.author.id]["matched"] == 1:
+            return await bot.say("You've already accepted a match! Please finish your other match first!")
         f = open("challenges.json", "r")
         s = f.read()
         challenges = json.loads(s)
         f.close()
-        if (member.id in challenges) == False:
-            return await bot.say(ctx.message.author.mention + ", " + member.name + " didn't challenge you or is challenging someone else.")
-        if challenges[member.id]["p2id"] == ctx.message.author.id:
-            if challenges[member.id]["p2accept"] == 1:
-                return await bot.say("You've already accepted the match!\nTo report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
-            challenges[member.id]["p2accept"] = 1
-            f = open("users.json" , "r")
-            s = f.read()
-            f.close()
-            users = json.loads(s)
+        found = 0
+        for i in challenges:
+            if found == 0:
+                if challenges[i]["p2id"] == ctx.message.author.id:
+                    if challenges[i]["p1id"] == member.id:
+                        if challenges[i]["p2accept"] == 1:
+                            return await bot.say("You've already accepted the match!\nTo report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
+                        else:
+                            found = 1
+                            challenges[i]["p2accept"] = 1
+                            users[ctx.message.author.id]["matched"] = 1
+                            users[member.id]["matched"] = 1
+                            f = open("users.json", "w")
+                            s = json.dumps(users)
+                            with open ("users.json", "w") as f:
+                                f.write(s)
+                            f.close()
+                            f = open("challenges.json", "w")
+                            s = json.dumps(challenges)
+                            with open ("challenges.json", "w") as f:
+                                f.write(s)
+                            f.close()
 
-            if users[ctx.message.author.id]["matched"] == 1:
-                return await bot.say("You've already accepted a match! Please finish your other match first!")
+        if found == 0:
+            return await bot.say(ctx.message.author.mention + ", " + member.name + " didn't challenge you. Cannot accept.")
 
-            users[ctx.message.author.id]["matched"] == 1
-            users[member.id]["matched"] == 1
-            f = open("users.json", "w")
-            s = json.dumps(users)
-            with open ("users.json", "w") as f:
-                f.write(s)
-            f.close()
-
-
-            f = open("challenges.json", "w")
-            s = json.dumps(challenges)
-            with open ("challenges.json", "w") as f:
-                f.write(s)
-            f.close()
-            await bot.say(ctx.message.author.mention + " has accepted " + member.mention + "'s challenge!")
-            return await bot.say("To report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
-        return await bot.say(ctx.message.author.mention + ", " + member.name + " didn't challenge you or is challenging someone else.")
+        return await bot.say(ctx.message.author.mention + " has accepted " + member.mention + "'s challenge!\nTo report score, simply type '!win @[winner]'")
 
 @bot.command(pass_context=True)
 async def win(ctx, member : discord.Member):
-    """Report match against a member as a win for you"""
-    if os.path.isfile("challenges.json") == False:
-        return await bot.say(ctx.message.author.mention + ", there are no active challenges.")
-    else:
-        f = open("challenges.json", "r")
-        s = f.read()
-        challenges = json.loads(s)
-        if ctx.message.author.id in challenges:
-            if challenges[ctx.message.author.id]["p2id"] != member.id or challenges[ctx.message.author.id]["p2accept"] != 1:
-                if member.id in challenges:
-                    if challenges[member.id]["p2id"] == ctx.message.author.id and challenges[member]["p2accept"] == 1:
-                        p1 = member
-                        p2 = ctx.message.author
-                    else:
-                        return await bot.say("You do not have an active match with " + member.name + ".")
-                else:
-                    return await bot.say("You do not have an active match with " + member.name + ".")
-
-
-            else:
-                p1 = ctx.message.author
-                p2 = member
-        else:
-            if (member.id in challenges) == False:
-                return await bot.say("You do not have an active match with " + member.name + ".")
-            else:
-                if challenges[member.id]["p2id"] == ctx.message.author.id and challenges[member.id]["p2accept"] == 1:
-                    p1 = member
-                    p2 = ctx.message.author
-                else:
-                    return await bot.say("You do not have an active match with " + member.name + ".")
-
-        ############
-
-        if p2 == member:
-            challenges[p1.id]["p1report"] = 1
-            if challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 0:
-                await bot.say(p1.name + " won!")
-                del challenges[p1.id]
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open ("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-                return updateScores(p1, p2)
-            elif (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 2) or (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == -2):
-                challenges[p1.id]["p1report"] = 0
-                challenges[p1.id]["p2report"] = 0
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-                await bot.say(p1.mention + ", " + p2.mention + ", you reported opposite outcomes. Please report again!")
-                return await bot.say("To report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
-            else:
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-
-                return await bot.say("Thank you for reporting the score. Waiting for " + p2.mention + " to report!")
-        else:
-            challenges[p1.id]["p2report"] = 1
-            if challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 0:
-                await bot.say(p2.name + " won!")
-                del challenges[p1.id]
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open ("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-                return updateScores(p2, p1)
-            elif (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 2) or (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == -2):
-
-                challenges[p1.id]["p1report"] = 0
-                challenges[p1.id]["p2report"] = 0
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-                await bot.say(p1.mention + ", " + p2.mention + ", you reported opposite outcomes. Please report again!")
-                return await bot.say("To report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
-            else:
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-                return await bot.say("Thank you for reporting the score. Waiting for " + p1.mention + " to report!")
-
-@bot.command(pass_context=True)
-async def lose(ctx, member : discord.Member):
-    """Report match against a member as a loss for you"""
-    if os.path.isfile("challenges.json") == False:
-        return await bot.say(ctx.message.author.mention + ", there are no active challenges.")
-    else:
-        f = open("challenges.json", "r")
-        s = f.read()
-        challenges = json.loads(s)
-        if ctx.message.author.id in challenges:
-            if challenges[ctx.message.author.id]["p2id"] != member.id or challenges[ctx.message.author.id]["p2accept"] != 1:
-                if member.id in challenges:
-                    if challenges[member.id]["p2id"] == ctx.message.author.id and challenges[member]["p2accept"] == 1:
-                        p1 = member
-                        p2 = ctx.message.author
-                    else:
-                        return await bot.say("You do not have an active match with " + member.name + ".")
-                else:
-                    return await bot.say("You do not have an active match with " + member.name + ".")
-
-
-            else:
-                p1 = ctx.message.author
-                p2 = member
-        else:
-            if (member.id in challenges) == False:
-                return await bot.say("You do not have an active match with " + member.name + ".")
-            else:
-                if challenges[member.id]["p2id"] == ctx.message.author.id and challenges[member.id]["p2accept"] == 1:
-                    p1 = member
-                    p2 = ctx.message.author
-                else:
-                    return await bot.say("You do not have an active match with " + member.name + ".")
-
-        ############
-
-        if p2 == member:
-            challenges[p1.id]["p1report"] = -1
-            if challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 0:
-                await bot.say(p2.name + " won!")
-                del challenges[p1.id]
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open ("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-                return updateScores(p2, p1)
-            elif (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 2) or (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == -2):
-                challenges[p1.id]["p1report"] = 0
-                challenges[p1.id]["p2report"] = 0
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-                await bot.say(p1.mention + ", " + p2.mention + ", you reported opposite outcomes. Please report again!")
-                return await bot.say("To report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
-            else:
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-
-                return await bot.say("Thank you for reporting the score. Waiting for " + p2.mention + " to report!")
-        else:
-            challenges[p1.id]["p2report"] = -1
-            if challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 0:
-                await bot.say(p1.name + " won!")
-                del challenges[p1.id]
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open ("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-                return updateScores(p1,p2)
-            elif (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 2) or (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == -2):
-
-                challenges[p1.id]["p1report"] = 0
-                challenges[p1.id]["p2report"] = 0
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-                await bot.say(p1.mention + ", " + p2.mention + ", you reported opposite outcomes. Please report again!")
-                return await bot.say("To report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
-            else:
-                f = open("challenges.json", "w")
-                s = json.dumps(challenges)
-                with open("challenges.json", "w") as f:
-                    f.write(s)
-                f.close()
-                return await bot.say("Thank you for reporting the score. Waiting for " + p1.mention + " to report!")
-
-def updateScores(winner : discord.Member, loser : discord.Member):
+    """Report the winner of a match"""
     f = open("users.json", "r")
     s = f.read()
     users = json.loads(s)
     f.close()
-    winnerMu = users[winner.id]["mu"]
-    winnerSigma = users[winner.id]["sigma"]
-    loserMu = users[loser.id]["mu"]
-    loserSigma = users[loser.id]["sigma"]
-    winnerRating = ts.create_rating(mu=winnerMu, sigma = winnerSigma)
-    loserRating = ts.create_rating(mu = loserMu, sigma = loserSigma)
-    winnerRating, loserRating = ts.rate_1vs1(winnerRating, loserRating)
 
-    users[winner.id]["mu"] = winnerRating.mu
-    users[winner.id]["sigma"] = winnerRating.sigma
-    users[winner.id]["score"] =ts.expose(winnerRating)
-    users[loser.id]["mu"] = loserRating.mu
-    users[loser.id]["sigma"] = loserRating.sigma
-    users[loser.id]["score"] = ts.expose(loserRating)
-    users[winner.id]["wins"] += 1
-    users[loser.id]["losses"] += 1
-    users[winner.id]["matched"] = 0
-    users[loser.id]["matched"] = 0
-
-    f = open("users.json", "w")
-    s = json.dumps(users)
-    with open("users.json", "w"):
-        f.write(s)
-    f.close()
+    if users[ctx.message.author.id]["matched"] == 0 or users[member.id]["matched"] == 0:
+        return await bot.say("You are not in a match with " + member.name + ".")
 
     f = open("challenges.json", "r")
     s = f.read()
     challenges = json.loads(s)
     f.close()
-    if winner.id in challenges:
-        del challenges[winner.id]
-    if loser.id in challenges:
-        del challenges[loser.id]
-    f = open("challenges.json" ,"w")
-    s = json.dumps(challenges)
-    with open("challenges.json", "w"):
+    found = 0
+    matchID = 0
+    winnerID = member.id
+    loserID = ctx.message.author.id
+    if ctx.message.author.id == member.id:
+        for i in challenges:
+            if found == 0:
+                if challenges[i]["p1id"] == winnerID and challenges[i]["p2accept"] == 1:
+                    found = 1
+                    matchID = i
+                    loserID = challenges[i]["p2id"]
+                    challenges[i]["p1report"] = 1
+                elif challenges[i]["p2id"] == winnerID and challenges[i]["p2accept"] == 1:
+                    found = 1
+                    matchID = i
+                    loserID = challenges[i]["p1id"]
+                    challenges[i]["p2report"] = 1
+    else:
+        for i in challenges:
+            if found == 0:
+                if challenges[i]["p1id"] == loserID and challenges[i]["p2accept"] == 1:
+                    found = 1
+                    matchID = i
+                    challenges[i]["p1report"] = -1
+                elif challenges[i]["p2id"] == loserID and challenges[i]["p2accept"] == 1:
+                    found = 1
+                    matchID = i
+                    challenges[i]["p2report"] = -1
+
+
+    if found == 0:
+        return await bot.say("No match was found.")
+
+    f = open("users.json", "r")
+    s = f.read()
+    users = json.loads(s)
+    f.close()
+
+    if challenges[matchID]["p1report"] + challenges[matchID]["p2report"] == 0:
+        await bot.say(users[winnerID]["name"] + " won!")
+        del challenges[matchID]
+        f = open("challenges.json", "w")
+        s = json.dumps(challenges)
+        with open ("challenges.json", "w") as f:
+            f.write(s)
+        f.close()
+        return updateScores(winnerID, loserID)
+    elif (challenges[matchID]["p1report"] + challenges[matchID]["p2report"] == 2) or (challenges[matchID]["p1report"] + challenges[matchID]["p2report"] == -2):
+        challenges[matchID]["p1report"] = 0
+        challenges[matchID]["p2report"] = 0
+        f = open("challenges.json", "w")
+        s = json.dumps(challenges)
+        with open("challenges.json", "w") as f:
+            f.write(s)
+        f.close()
+        await bot.say("You reported opposite outcomes. Please report again!")
+        return await bot.say("To report score, simply type '!win @[winner]'")
+    else:
+        f = open("challenges.json", "w")
+        s = json.dumps(challenges)
+        with open("challenges.json", "w") as f:
+            f.write(s)
+        f.close()
+
+        return await bot.say("Thank you for reporting the score. Waiting for your opponnent to report!")
+
+#@bot.command(pass_context=True)
+#async def lose(ctx, member : discord.Member):
+#    """Report match against a member as a loss for you"""
+#    if os.path.isfile("challenges.json") == False:
+#        return await bot.say(ctx.message.author.mention + ", there are no active challenges.")
+#    else:
+#        f = open("challenges.json", "r")
+#        s = f.read()
+#        challenges = json.loads(s)
+#        if ctx.message.author.id in challenges:
+#            if challenges[ctx.message.author.id]["p2id"] != member.id or challenges[ctx.message.author.id]["p2accept"] != 1:
+#                if member.id in challenges:
+#                    if challenges[member.id]["p2id"] == ctx.message.author.id and challenges[member]["p2accept"] == 1:
+#                        p1 = member
+#                        p2 = ctx.message.author
+#                    else:
+#                        return await bot.say("You do not have an active match with " + member.name + ".")
+#                else:
+#                    return await bot.say("You do not have an active match with " + member.name + ".")
+
+
+#            else:
+#                p1 = ctx.message.author
+#                p2 = member
+#        else:
+#            if (member.id in challenges) == False:
+#                return await bot.say("You do not have an active match with " + member.name + ".")
+#            else:
+#                if challenges[member.id]["p2id"] == ctx.message.author.id and challenges[member.id]["p2accept"] == 1:
+#                    p1 = member
+#                    p2 = ctx.message.author
+#                else:
+#                    return await bot.say("You do not have an active match with " + member.name + ".")
+
+        ############
+
+#        if p2 == member:
+#            challenges[p1.id]["p1report"] = -1
+#            if challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 0:
+#                await bot.say(p2.name + " won!")
+#                del challenges[p1.id]
+#                f = open("challenges.json", "w")
+#                s = json.dumps(challenges)
+#                with open ("challenges.json", "w") as f:
+#                    f.write(s)
+#                f.close()
+#                return updateScores(p2, p1)
+#            elif (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 2) or (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == -2):
+#                challenges[p1.id]["p1report"] = 0
+#                challenges[p1.id]["p2report"] = 0
+#                f = open("challenges.json", "w")
+#                s = json.dumps(challenges)
+#                with open("challenges.json", "w") as f:
+#                    f.write(s)
+#                f.close()
+#                await bot.say(p1.mention + ", " + p2.mention + ", you reported opposite outcomes. Please report again!")
+#                return await bot.say("To report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
+#            else:
+#                f = open("challenges.json", "w")
+#                s = json.dumps(challenges)
+#                with open("challenges.json", "w") as f:
+#                    f.write(s)
+#                f.close()
+
+#                return await bot.say("Thank you for reporting the score. Waiting for " + p2.mention + " to report!")
+#        else:
+#            challenges[p1.id]["p2report"] = -1
+#            if challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 0:
+#                await bot.say(p1.name + " won!")
+#                del challenges[p1.id]
+#                f = open("challenges.json", "w")
+#                s = json.dumps(challenges)
+#                with open ("challenges.json", "w") as f:
+#                    f.write(s)
+#                f.close()
+#                return updateScores(p1,p2)
+#            elif (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 2) or (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == -2):
+
+#                challenges[p1.id]["p1report"] = 0
+#                challenges[p1.id]["p2report"] = 0
+#                f = open("challenges.json", "w")
+#                s = json.dumps(challenges)
+#                with open("challenges.json", "w") as f:
+#                    f.write(s)
+#                f.close()
+#                await bot.say(p1.mention + ", " + p2.mention + ", you reported opposite outcomes. Please report again!")
+#                return await bot.say("To report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
+#            else:
+#                f = open("challenges.json", "w")
+#                s = json.dumps(challenges)
+#                with open("challenges.json", "w") as f:
+#                    f.write(s)
+#                f.close()
+#                return await bot.say("Thank you for reporting the score. Waiting for " + p1.mention + " to report!")
+
+def updateScores(winner : discord.Member.id, loser : discord.Member.id):
+    f = open("users.json", "r")
+    s = f.read()
+    users = json.loads(s)
+    f.close()
+    winnerMu = users[winner]["mu"]
+    winnerSigma = users[winner]["sigma"]
+    loserMu = users[loser]["mu"]
+    loserSigma = users[loser]["sigma"]
+    winnerRating = ts.create_rating(mu=winnerMu, sigma = winnerSigma)
+    loserRating = ts.create_rating(mu = loserMu, sigma = loserSigma)
+    winnerRating, loserRating = ts.rate_1vs1(winnerRating, loserRating)
+
+    users[winner]["mu"] = winnerRating.mu
+    users[winner]["sigma"] = winnerRating.sigma
+    users[winner]["score"] =ts.expose(winnerRating)
+    users[loser]["mu"] = loserRating.mu
+    users[loser]["sigma"] = loserRating.sigma
+    users[loser]["score"] = ts.expose(loserRating)
+    users[winner]["wins"] += 1
+    users[loser]["losses"] += 1
+    users[winner]["matched"] = 0
+    users[loser]["matched"] = 0
+
+    f = open("users.json", "w")
+    s = json.dumps(users)
+    with open("users.json", "w"):
         f.write(s)
     f.close()
 
@@ -457,13 +447,91 @@ async def leaderboard():
 
     sortedlb = sorted(lb.items(), key=operator.itemgetter(1), reverse = True)
 
-    await bot.say("Leaderboard:")
+    s = "Leaderboard:"
     i = 0
     for user in sortedlb:
         i += 1
-        await bot.say(str(i) + ": \t\tName:\t" + user[0] + "\t\t\t\t\t\t\t\tscore:\t\t" + str(user[1]))
+        s += "\n" + str(i) + ": \t\tName:\t" + user[0] + "\t\t\t\t\t\t\t\tscore:\t\t" + str(user[1])
 
-    return
+    return await bot.say(s)
 
+@bot.command(pass_context=True)
+async def cancel(ctx):
+    """If not in a match, cancels all of your outgoing challenges. If in a match, opponent must cancel as well"""
+    p1 = ctx.message.author
+    f = open("users.json", "r")
+    s = f.read()
+    users = json.loads(s)
+    f.close()
+    f = open("challenges.json", "r")
+    s = f.read()
+    challenges = json.loads(s)
+    f.close()
+    if p1.id in users:
+        if users[p1.id]["matched"] == 0:
+            for challenge in list(challenges):
+                if challenges[challenge]["p1id"] == p1.id:
+                    del challenges[challenge]
+            f = open("challenges.json", "w")
+            s = json.dumps(challenges)
+            with open("challenges.json", "w") as f:
+                f.write(s)
+            f.close()
+            return await bot.say("Canceled all your challenge requests.\nNote, you can still accept challenges from others who have challenged you before your cancel.")
+        else:
+            for challenge in list(challenges):
+                if (challenges[challenge]["p1id"] == p1.id) and (challenges[challenge]["p2accept"] == 1):
+                    if challenges[challenge]["p2cancel"] == 1:
+                        users[p1.id]["matched"] = 0
+                        users[challenges[challenge]["p2id"]]["matched"] = 0
+                        opName = challenges[challenge]["p2name"]
+                        del challenges[challenge]
+                        f = open("challenges.json", "w")
+                        s = json.dumps(challenges)
+                        with open("challenges.json", "w") as f:
+                            f.write(s)
+                        f.close()
+                        f = open("users.json", "w")
+                        s = json.dumps(users)
+                        with open("users.json", "w") as f:
+                            f.write(s)
+                        f.close()
+                        print("hi")
+                        return await bot.say("Canceled " + p1.name + " and " + opName + "'s match.")
+                    else:
+                        challenges[challenge]["p1cancel"] = 1
+                        f = open("challenges.json", "w")
+                        s = json.dumps(challenges)
+                        with open("challenges.json", "w") as f:
+                            f.write(s)
+                        f.close()
+                        return await bot.say(challenges[challenge]["p2name"] + " must also cancel for the match to be canceled.")
+                elif challenges[challenge]["p2id"] == p1.id and challenges[challenge]["p2accept"] == 1:
+                    challenges[challenge]["p2cancel"] = 1
+                    if challenges[challenge]["p1cancel"] == 1:
+                        users[p1.id]["matched"] = 0
+                        users[challenges[challenge]["p1id"]]["matched"] = 0
+                        opName = challenges[challenge]["p1name"]
+                        del challenges[challenge]
+                        f = open("challenges.json", "w")
+                        s = json.dumps(challenges)
+                        with open("challenges.json", "w") as f:
+                            f.write(s)
+                        f.close()
+                        f = open("users.json", "w")
+                        s = json.dumps(users)
+                        with open("users.json", "w") as f:
+                            f.write(s)
+                        f.close()
+                        return await bot.say("Canceled "  + opName + " and " + p1.name+ "'s match.")
+                    else:
+                        f = open("challenges.json", "w")
+                        s = json.dumps(challenges)
+                        with open("challenges.json", "w") as f:
+                            f.write(s)
+                        f.close()
+                        return await bot.say(challenges[challenge]["p1name"] + " must also cancel for the match to be canceled.")
 
-bot.run("Mjk4NjI5NTg0MTk3MjU1MTc4.C8SIQg.eADT6SvtC1bYTUZza7k-0ppRDyY")
+    else:
+        return await bot.say("You have are not registered!")
+bot.run("Mjk3MTA2MjcwMDc3NTgzNDAx.C8WQWA.wkUEinxw43GZ3W8UWW_iU1jhsBw")
