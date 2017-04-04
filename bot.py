@@ -6,6 +6,7 @@ import logging
 import json
 import os.path
 import trueskill
+import operator
 
 #things left to implement
 #
@@ -439,6 +440,30 @@ def updateScores(winner : discord.Member, loser : discord.Member):
     with open("challenges.json", "w"):
         f.write(s)
     f.close()
+
+@bot.command()
+async def leaderboard():
+    """Shows the current top 10 and their scores"""
+    f = open("users.json", "r")
+    s = f.read()
+    users = json.loads(s)
+    f.close()
+    lb = {}
+    for user in users:
+        if users[user]["score"] < 1:
+            lb[users[user]["name"]] = 0
+        else:
+            lb[users[user]["name"]] = int(1000 * ts.expose(ts.create_rating(mu=users[user]["mu"], sigma=users[user]["sigma"])))
+
+    sortedlb = sorted(lb.items(), key=operator.itemgetter(1), reverse = True)
+
+    await bot.say("Leaderboard:")
+    i = 0
+    for user in sortedlb:
+        i += 1
+        await bot.say(str(i) + ": \t\tName:\t" + user[0] + "\t\t\t\t\t\t\t\tscore:\t\t" + str(user[1]))
+
+    return
 
 
 bot.run("Mjk4NjI5NTg0MTk3MjU1MTc4.C8SIQg.eADT6SvtC1bYTUZza7k-0ppRDyY")
