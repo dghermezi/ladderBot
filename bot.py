@@ -10,14 +10,14 @@ import trueskill
 #things left to implement
 #
 #leaderboards
-#make it so you cant challenge/be challenged/accept a match if youre currently in one
 #cancel matches without forfeit? up to tempo i guess
 #proper documentation
 #let someone challenge more than one user at a time
 #clean up messy code/use functions/methods
 #decay
+#help
 
-
+description = '''Ladder system implemented using trueskill. Currently in beta. Message @Videowaffles#3628 to report bugs/make suggestions'''
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -25,7 +25,7 @@ handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w'
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
-bot = Bot(command_prefix="!")
+bot = Bot(command_prefix="!", description = description)
 ts = trueskill.TrueSkill(draw_probability = 0.00)
 SCORE_MULTIPLYER = 1000
 
@@ -35,6 +35,7 @@ async def on_read():
 
 @bot.command(pass_context=True)
 async def register(ctx):
+    """Registers a user\n"""
 
     if os.path.isfile("users.json") == False:
         users = {}
@@ -80,6 +81,8 @@ async def register(ctx):
 
 @bot.command()
 async def score(member : discord.Member):
+    """Shows score of a registered member"""
+
     if os.path.isfile("users.json") == False:
         return await bot.say(member.name + " is not registered!")
     else:
@@ -99,6 +102,7 @@ async def score(member : discord.Member):
 #todo: let someone challenge more than one person at a time
 @bot.command(pass_context=True)
 async def challenge(ctx, member : discord.Member):
+    """Challenges a member to a match"""
     if ctx.message.author.id == member.id:
         return await bot.say("You can't challenge yourself!")
     if os.path.isfile("users.json") == False:
@@ -162,6 +166,7 @@ async def challenge(ctx, member : discord.Member):
 
 @bot.command(pass_context=True)
 async def accept(ctx, member : discord.Member):
+    """Accepts a challenge from a member"""
     if os.path.isfile("challenges.json") == False:
         return await bot.say(ctx.message.author.mention + ", " + member.name + " didn't challenge you or is challenging someone else.")
     else:
@@ -203,6 +208,7 @@ async def accept(ctx, member : discord.Member):
 
 @bot.command(pass_context=True)
 async def win(ctx, member : discord.Member):
+    """Report match against a member as a win for you"""
     if os.path.isfile("challenges.json") == False:
         return await bot.say(ctx.message.author.mention + ", there are no active challenges.")
     else:
@@ -297,6 +303,7 @@ async def win(ctx, member : discord.Member):
 
 @bot.command(pass_context=True)
 async def lose(ctx, member : discord.Member):
+    """Report match against a member as a loss for you"""
     if os.path.isfile("challenges.json") == False:
         return await bot.say(ctx.message.author.mention + ", there are no active challenges.")
     else:
@@ -434,4 +441,4 @@ def updateScores(winner : discord.Member, loser : discord.Member):
     f.close()
 
 
-bot.run("Mjk3MTA2MjcwMDc3NTgzNDAx.C78Vqg.7mwzkkPmwP1MxFJ1Oqr51AxPpjg")
+bot.run("Mjk4NjI5NTg0MTk3MjU1MTc4.C8SIQg.eADT6SvtC1bYTUZza7k-0ppRDyY")
