@@ -534,4 +534,4 @@ async def cancel(ctx):
 
     else:
         return await bot.say("You have are not registered!")
-bot.run("Mjk3MTA2MjcwMDc3NTgzNDAx.C8WQWA.wkUEinxw43GZ3W8UWW_iU1jhsBw")
+bot.run("Mjk4NjI5NTg0MTk3MjU1MTc4.C8Ww9Q.rDlxzAqSebCNR0zj9rkrwIBWCKc")
