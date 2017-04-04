@@ -9,12 +9,14 @@ import trueskill
 
 #things left to implement
 #
-#assign trueskill to everyone
 #leaderboards
-#change points to trueskill points
 #make it so you cant challenge/be challenged/accept a match if youre currently in one
 #cancel matches without forfeit? up to tempo i guess
-#find a way to save trueskill
+#proper documentation
+#let someone challenge more than one user at a time
+#clean up messy code/use functions/methods
+#decay
+
 
 
 logger = logging.getLogger('discord')
@@ -24,41 +26,26 @@ handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(me
 logger.addHandler(handler)
 
 bot = Bot(command_prefix="!")
-
-#users = {}
-#users['Videowaffles'] = {
-#    'id': 1,
-#    'points': 100
-#}
-#users['Kay'] = {
-#    'id': 2,
-#    'points': 100
-#}
-#s = json.dumps(users)
-
-#with open("users.json", "w") as f:
-#    f.write(s)
-
+ts = trueskill.TrueSkill(draw_probability = 0.00)
+SCORE_MULTIPLYER = 1000
 
 @bot.event
 async def on_read():
     print("Client logged in")
 
-@bot.command()
-async def hello(message):
-    msg = 'Hello {0.author.mention}'.format(message)
-    await client.send_message(message.channel, msg)
-
 @bot.command(pass_context=True)
 async def register(ctx):
-    #await bot.say("Registering/checking if you're already registered. please give me a sec!")
 
     if os.path.isfile("users.json") == False:
         users = {}
         users[ctx.message.author.id] = {
         "name": ctx.message.author.name,
-        "points": 500,
-        "matched": 0
+        "mu": 25.0,
+        "sigma": 8.333,
+        "score": 0,
+        "matched": 0,
+        "wins": 0,
+        "losses": 0
         }
         f = open("users.json", "w+")
         s = json.dumps(users)
@@ -77,8 +64,12 @@ async def register(ctx):
         else:
             users[ctx.message.author.id] = {
                     "name": ctx.message.author.name,
-                    "points": 500,
-                    "matched": 0
+                    "mu": 25.0,
+                    "sigma": 8.333,
+                    "score": 0,
+                    "matched": 0,
+                    "wins": 0,
+                    "losses": 0
                     }
             f = open("users.json" ,"w")
             s = json.dumps(users)
@@ -88,7 +79,7 @@ async def register(ctx):
             return await bot.say(ctx.message.author.name + " is now registered!")
 
 @bot.command()
-async def points(member : discord.Member):
+async def score(member : discord.Member):
     if os.path.isfile("users.json") == False:
         return await bot.say(member.name + " is not registered!")
     else:
@@ -97,16 +88,13 @@ async def points(member : discord.Member):
         users = json.loads(s)
         f.close()
         if member.id in users:
-            return await bot.say(member.name + " has " + str(users[member.id]["points"]) + " points!")
+            score = users[member.id]["score"]
+            if score < 1:
+                return await bot.say(member.name + " has a score of 0!")
+            else:
+                return await bot.say(member.name + " has a score of " + str(int(SCORE_MULTIPLYER * score)) + "!")
         else:
             return await bot.say(member.name + " is not registered!")
-        #for user in users:
-        #    found = 0
-        #    if users[user]["id"] == str(member.id):
-        #        found = 1
-        #        return await bot.say(member.name + " has " + str(users[user]["points"]) + " points!")
-        #if found == 0:
-        #    return await bot.say(member.name + " is not registered!")
 
 #todo: let someone challenge more than one person at a time
 @bot.command(pass_context=True)
@@ -144,10 +132,14 @@ async def challenge(ctx, member : discord.Member):
                 f = open("challenges.json", "r")
                 s = f.read()
                 challenges = json.loads(s)
-                if (ctx.message.author.id in challenges):
-                    if challenges[ctx.message.author.id]["p2accept"] == 1:
-                        await bot.say(ctx.message.author.mention + ", you already have an accepted match with " + challenges[ctx.message.author.id]["p2name"] + ".")
-                        return await bot.say("You must both report the score using !win @[opponent] if you won and !lose @[opponent] if you lost!")
+                if users[ctx.message.author.id]["matched"] == 1:
+                    if (ctx.message.author.id in challenges):
+                        if challenges[ctx.message.author.id]["p2accept"] == 1:
+                            await bot.say(ctx.message.author.mention + ", you already have an accepted match with " + challenges[ctx.message.author.id]["p2name"] + ".")
+                            return await bot.say("You must both report the score using !win @[opponent] if you won and !lose @[opponent] if you lost!")
+                    for oppID in challenges:
+                        if challenges[oppID]["p2accept"] == 1 and challenges[oppID]["p2id"] == ctx.message.author.id:
+                            return await bot.say("You've already accepted a challenge from " + users[oppID]["name"] + "! Please finish that match first!")
                 challenges[ctx.message.author.id] = {
                 "p1name": ctx.message.author.name,
                 "p2id": member.id,
@@ -181,8 +173,25 @@ async def accept(ctx, member : discord.Member):
             return await bot.say(ctx.message.author.mention + ", " + member.name + " didn't challenge you or is challenging someone else.")
         if challenges[member.id]["p2id"] == ctx.message.author.id:
             if challenges[member.id]["p2accept"] == 1:
-                return await bot.say("you've already accepted the match!\nTo report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
+                return await bot.say("You've already accepted the match!\nTo report score, the winner must type '!win @[opponent]' and the loser must type '!lose @[opponent]'")
             challenges[member.id]["p2accept"] = 1
+            f = open("users.json" , "r")
+            s = f.read()
+            f.close()
+            users = json.loads(s)
+
+            if users[ctx.message.author.id]["matched"] == 1:
+                return await bot.say("You've already accepted a match! Please finish your other match first!")
+
+            users[ctx.message.author.id]["matched"] == 1
+            users[member.id]["matched"] == 1
+            f = open("users.json", "w")
+            s = json.dumps(users)
+            with open ("users.json", "w") as f:
+                f.write(s)
+            f.close()
+
+
             f = open("challenges.json", "w")
             s = json.dumps(challenges)
             with open ("challenges.json", "w") as f:
@@ -237,7 +246,7 @@ async def win(ctx, member : discord.Member):
                 with open ("challenges.json", "w") as f:
                     f.write(s)
                 f.close()
-                return #p1 won. trueskill time
+                return updateScores(p1, p2)
             elif (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 2) or (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == -2):
                 challenges[p1.id]["p1report"] = 0
                 challenges[p1.id]["p2report"] = 0
@@ -259,14 +268,14 @@ async def win(ctx, member : discord.Member):
         else:
             challenges[p1.id]["p2report"] = 1
             if challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 0:
-                await bot.say(p2.name + "won!")
+                await bot.say(p2.name + " won!")
                 del challenges[p1.id]
                 f = open("challenges.json", "w")
                 s = json.dumps(challenges)
                 with open ("challenges.json", "w") as f:
                     f.write(s)
                 f.close()
-                return #p2 won. trueskill time
+                return updateScores(p2, p1)
             elif (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 2) or (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == -2):
 
                 challenges[p1.id]["p1report"] = 0
@@ -324,14 +333,14 @@ async def lose(ctx, member : discord.Member):
         if p2 == member:
             challenges[p1.id]["p1report"] = -1
             if challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 0:
-                await bot.say(p2.name + "won!")
+                await bot.say(p2.name + " won!")
                 del challenges[p1.id]
                 f = open("challenges.json", "w")
                 s = json.dumps(challenges)
                 with open ("challenges.json", "w") as f:
                     f.write(s)
                 f.close()
-                return #p2 won. trueskill time and delete challenge
+                return updateScores(p2, p1)
             elif (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 2) or (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == -2):
                 challenges[p1.id]["p1report"] = 0
                 challenges[p1.id]["p2report"] = 0
@@ -360,7 +369,7 @@ async def lose(ctx, member : discord.Member):
                 with open ("challenges.json", "w") as f:
                     f.write(s)
                 f.close()
-                return #p1 won. trueskill time
+                return updateScores(p1,p2)
             elif (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == 2) or (challenges[p1.id]["p1report"] + challenges[p1.id]["p2report"] == -2):
 
                 challenges[p1.id]["p1report"] = 0
@@ -380,7 +389,49 @@ async def lose(ctx, member : discord.Member):
                 f.close()
                 return await bot.say("Thank you for reporting the score. Waiting for " + p1.mention + " to report!")
 
+def updateScores(winner : discord.Member, loser : discord.Member):
+    f = open("users.json", "r")
+    s = f.read()
+    users = json.loads(s)
+    f.close()
+    winnerMu = users[winner.id]["mu"]
+    winnerSigma = users[winner.id]["sigma"]
+    loserMu = users[loser.id]["mu"]
+    loserSigma = users[loser.id]["sigma"]
+    winnerRating = ts.create_rating(mu=winnerMu, sigma = winnerSigma)
+    loserRating = ts.create_rating(mu = loserMu, sigma = loserSigma)
+    winnerRating, loserRating = ts.rate_1vs1(winnerRating, loserRating)
 
+    users[winner.id]["mu"] = winnerRating.mu
+    users[winner.id]["sigma"] = winnerRating.sigma
+    users[winner.id]["score"] =ts.expose(winnerRating)
+    users[loser.id]["mu"] = loserRating.mu
+    users[loser.id]["sigma"] = loserRating.sigma
+    users[loser.id]["score"] = ts.expose(loserRating)
+    users[winner.id]["wins"] += 1
+    users[loser.id]["losses"] += 1
+    users[winner.id]["matched"] = 0
+    users[loser.id]["matched"] = 0
+
+    f = open("users.json", "w")
+    s = json.dumps(users)
+    with open("users.json", "w"):
+        f.write(s)
+    f.close()
+
+    f = open("challenges.json", "r")
+    s = f.read()
+    challenges = json.loads(s)
+    f.close()
+    if winner.id in challenges:
+        del challenges[winner.id]
+    if loser.id in challenges:
+        del challenges[loser.id]
+    f = open("challenges.json" ,"w")
+    s = json.dumps(challenges)
+    with open("challenges.json", "w"):
+        f.write(s)
+    f.close()
 
 
 bot.run("Mjk3MTA2MjcwMDc3NTgzNDAx.C78Vqg.7mwzkkPmwP1MxFJ1Oqr51AxPpjg")
