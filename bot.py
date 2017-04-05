@@ -151,11 +151,11 @@ async def challenge(ctx, member : discord.Member):
                 for i in challenges:
                     if challenges[i]["p1id"] == ctx.message.author.id and challenges[i]["p2id"] == member.id:
                         return await bot.say(ctx.message.author.mention + " is challenging " + member.mention +"\ntype '!accept @[challenger]' to accept!")
-                    if challenges[i]["p2id"] == ctx.message.author.id and challenges[i]["p1id"] == member.id:
+                    #if challenges[i]["p2id"] == ctx.message.author.id and challenges[i]["p1id"] == member.id:
                         return await bot.say(ctx.message.author.mention + " is challenging " + member.mention +"\ntype '!accept @[challenger]' to accept!")
 
                 i = 1
-                while i in challenges:
+                while str(i) in challenges:
                     i += 1
                 challenges[i] = {
                 "p1id": ctx.message.author.id,
@@ -430,6 +430,44 @@ def updateScores(winner : discord.Member.id, loser : discord.Member.id):
         f.write(s)
     f.close()
 
+    if os.path.isfile("match_history.json") == False:
+        i = 1
+        history = {}
+        history[i] = {
+        "winnerID": winner,
+        "winnerName": users[winner]["name"],
+        "loserName": users[loser]["name"],
+        "loserID": loser,
+        "time": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        }
+        f = open("match_history.json", "w+")
+        s = json.dumps(history)
+        with open("match_history.json", "w+") as f:
+            f.write(s)
+        f.close()
+    else:
+        f = open("match_history.json", "r")
+        s = f.read()
+        history = json.loads(s)
+        f.close()
+        i = 1
+        print(type(i))
+        while str(i) in history:
+            i += 1
+        history[i] = {
+        "winnerID": winner,
+        "winnerName": users[winner]["name"],
+        "loserName": users[loser]["name"],
+        "loserID": loser,
+        "time": time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+        }
+        f = open("match_history.json", "w")
+        s = json.dumps(history)
+        with open("match_history.json", "w") as f:
+            f.write(s)
+        f.close()
+
+
 @bot.command(pass_context=True)
 async def leaderboard(ctx):
     """Shows the current top 10 and their scores"""
@@ -549,11 +587,7 @@ async def cancel(ctx):
 
 @bot.command(pass_context=True)
 async def anycoy(ctx):
-    """Looks for an opponent"""
-    #test = int(round(time.time()))
-    #while (int(round(time.time())) - test < 60):
-    #    print("a")
-    #print("done")
+    """Looks for an opponent. Places you in a 'queue' for 10 minutes"""
     if os.path.isfile("anycoy.json") == False:
         anycoy = {}
         anycoy[ctx.message.author.id] = {
@@ -600,11 +634,32 @@ async def anycoy(ctx):
                 p2 = ts.create_rating(mu=users[user]["mu"], sigma=users[user]["sigma"])
                 if ts.quality_1vs1(p1, p2) > quality:
                     quality = ts.quality_1vs1(p1,p2)
-                    name = users[user]["name"]
+                    name = users[user]["mention"]
         if found > 0:
-            return await bot.say("Your best match would be with " + users[user]["mention"] + ".\nAll users looking for a match right now: " + allUsers + "\nType '!challenge @[opponent] to challenge someone!'")
+            return await bot.say("Your best match would be with " + name + ".\nAll users looking for a match right now: " + allUsers + "\nType '!challenge @[opponent]' to challenge someone!")
         else:
             return await bot.say("No one else is looking to play right now :(")
+
+@bot.command(pass_context=True)
+async def history(ctx):
+    """Whispers you your match history"""
+    user = ctx.message.author
+    f = open("users.json", "r")
+    s = f.read()
+    users = json.loads(s)
+    f.close()
+    string =  "```\nTotal Wins:  " + str(users[user.id]["wins"]) + "   |   Total Losses:  " + str(users[user.id]["losses"]) + "\n"
+    f=open("match_history.json", "r")
+    s = f.read()
+    history = json.loads(s)
+    f.close()
+    for match in history:
+        if history[match]["winnerID"] == ctx.message.author.id:
+            string += "\nWIN against " + history[match]["loserName"] + " on " + history[match]["time"]
+        elif history[match]["loserID"] == ctx.message.author.id:
+            string +=  "\nLOSS to " + history[match]["loserName"] + " on " + history[match]["time"]
+    string += "\n```"
+    return await bot.send_message(user, string)
 
 
 bot.run("Mjk4NjI5NTg0MTk3MjU1MTc4.C8Ww9Q.rDlxzAqSebCNR0zj9rkrwIBWCKc")
