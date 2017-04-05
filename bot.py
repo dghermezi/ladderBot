@@ -403,12 +403,13 @@ async def cancel(ctx):
     s = f.read()
     anycoy = json.loads(s)
     f.close()
-    del anycoy[p1.id]
-    f = open("anycoy.json", "w")
-    s = json.dumps(anycoy)
-    with open("anycoy.json", "w") as f:
-        f.write(s)
-    f.close()
+    if p1.id in anycoy:
+        del anycoy[p1.id]
+        f = open("anycoy.json", "w")
+        s = json.dumps(anycoy)
+        with open("anycoy.json", "w") as f:
+            f.write(s)
+        f.close()
 
     if p1.id in users:
         if users[p1.id]["matched"] == 0:
@@ -482,6 +483,13 @@ async def cancel(ctx):
 @bot.command(pass_context=True)
 async def anycoy(ctx):
     """Looks for an opponent. Places you in a 'queue' for 10 minutes"""
+    f = open("users.json", "r")
+    s = f.read()
+    users = json.loads(s)
+
+    if (ctx.message.author.id in users) == False:
+        print(ctx.message.author.id in users == False)
+        return await bot.say("You must register first. Type !register")
     if os.path.isfile("anycoy.json") == False:
         anycoy = {}
         anycoy[ctx.message.author.id] = {
@@ -504,6 +512,11 @@ async def anycoy(ctx):
         users = json.loads(s)
         f.close()
 
+
+        anycoy[ctx.message.author.id] = {
+        "name": ctx.message.author.name,
+        "time": int(round(time.time()))
+        }
         for user in list(anycoy):
             if int(round(time.time())) - anycoy[user]["time"] > 600:
                 del anycoy[user]
@@ -556,4 +569,4 @@ async def history(ctx):
     return await bot.send_message(user, string)
 
 
-bot.run("token")
+bot.run("Mjk4NjI5NTg0MTk3MjU1MTc4.C8beXQ.RYxOkPkC4q43kd4tUEV1_U9lUEE")
