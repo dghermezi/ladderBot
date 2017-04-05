@@ -7,16 +7,13 @@ import json
 import os.path
 import trueskill
 import operator
+import time
 
 #things left to implement
 #
-#leaderboards
-#cancel matches without forfeit? up to tempo i guess
 #proper documentation
-#let someone challenge more than one user at a time
 #clean up messy code/use functions/methods
 #decay
-#help
 
 description = '''Ladder system implemented using trueskill. Currently in beta. Message @Videowaffles#3628 to report bugs/make suggestions'''
 
@@ -47,7 +44,8 @@ async def register(ctx):
         "score": 0,
         "matched": 0,
         "wins": 0,
-        "losses": 0
+        "losses": 0,
+        "mention": ctx.message.author.mention
         }
         f = open("users.json", "w+")
         s = json.dumps(users)
@@ -71,7 +69,8 @@ async def register(ctx):
                     "score": 0,
                     "matched": 0,
                     "wins": 0,
-                    "losses": 0
+                    "losses": 0,
+                    "mention": ctx.message.author.mention
                     }
             f = open("users.json" ,"w")
             s = json.dumps(users)
@@ -431,8 +430,8 @@ def updateScores(winner : discord.Member.id, loser : discord.Member.id):
         f.write(s)
     f.close()
 
-@bot.command()
-async def leaderboard():
+@bot.command(pass_context=True)
+async def leaderboard(ctx):
     """Shows the current top 10 and their scores"""
     f = open("users.json", "r")
     s = f.read()
@@ -447,13 +446,14 @@ async def leaderboard():
 
     sortedlb = sorted(lb.items(), key=operator.itemgetter(1), reverse = True)
 
-    s = "Leaderboard:"
+    s = "```\nLeaderboard:"
     i = 0
     for user in sortedlb:
         i += 1
-        s += "\n" + str(i) + ": \t\tName:\t" + user[0] + "\t\t\t\t\t\t\t\tscore:\t\t" + str(user[1])
+        s += "\n{:>3}: Name:  {:<20}\tscore:  {:<10}".format(str(i), user[0], str(user[1]))
 
-    return await bot.say(s)
+    s += "\n```"
+    return await bot.send_message(ctx.message.channel, s)
 
 @bot.command(pass_context=True)
 async def cancel(ctx):
@@ -467,6 +467,17 @@ async def cancel(ctx):
     s = f.read()
     challenges = json.loads(s)
     f.close()
+    f = open("anycoy.json", "r")
+    s = f.read()
+    anycoy = json.loads(s)
+    f.close()
+    del anycoy[p1.id]
+    f = open("anycoy.json", "w")
+    s = json.dumps(anycoy)
+    with open("anycoy.json", "w") as f:
+        f.write(s)
+    f.close()
+
     if p1.id in users:
         if users[p1.id]["matched"] == 0:
             for challenge in list(challenges):
@@ -534,4 +545,66 @@ async def cancel(ctx):
 
     else:
         return await bot.say("You have are not registered!")
+
+
+@bot.command(pass_context=True)
+async def anycoy(ctx):
+    """Looks for an opponent"""
+    #test = int(round(time.time()))
+    #while (int(round(time.time())) - test < 60):
+    #    print("a")
+    #print("done")
+    if os.path.isfile("anycoy.json") == False:
+        anycoy = {}
+        anycoy[ctx.message.author.id] = {
+        "name": ctx.message.author.name,
+        "time": int(round(time.time()))
+        }
+        f = open("anycoy.json", "w+")
+        s = json.dumps(anycoy)
+        with open("anycoy.json", "w+") as f:
+            f.write(s)
+        f.close()
+        return await bot.say("No one else is looking to play right now :(")
+    else:
+        f = open("anycoy.json", "r")
+        s = f.read()
+        anycoy = json.loads(s)
+        f.close()
+        f = open("users.json", "r")
+        s = f.read()
+        users = json.loads(s)
+        f.close()
+
+        for user in list(anycoy):
+            if int(round(time.time())) - anycoy[user]["time"] > 600:
+                del anycoy[user]
+        anycoy[ctx.message.author.id] = {
+        "name": ctx.message.author.name,
+        "time": int(round(time.time()))
+        }
+        f = open("anycoy.json", "w")
+        s = json.dumps(anycoy)
+        with open("anycoy.json", "w") as f:
+            f.write(s)
+        f.close()
+        found = 0
+        quality = 0
+        name = ""
+        allUsers = ""
+        p1 = ts.create_rating(mu=users[ctx.message.author.id]["mu"], sigma = users[ctx.message.author.id]["sigma"])
+        for user in anycoy:
+            if user != ctx.message.author.id:
+                found += 1
+                allUsers += users[user]["mention"] + "\t"
+                p2 = ts.create_rating(mu=users[user]["mu"], sigma=users[user]["sigma"])
+                if ts.quality_1vs1(p1, p2) > quality:
+                    quality = ts.quality_1vs1(p1,p2)
+                    name = users[user]["name"]
+        if found > 0:
+            return await bot.say("Your best match would be with " + users[user]["mention"] + ".\nAll users looking for a match right now: " + allUsers + "\nType '!challenge @[opponent] to challenge someone!'")
+        else:
+            return await bot.say("No one else is looking to play right now :(")
+
+
 bot.run("Mjk4NjI5NTg0MTk3MjU1MTc4.C8Ww9Q.rDlxzAqSebCNR0zj9rkrwIBWCKc")
